@@ -30,6 +30,7 @@ if [ ! -z "$FRONTEND_AMI_ID" ]; then
         --output text 2>/dev/null)
 
     aws ec2 deregister-image --image-id $FRONTEND_AMI_ID
+
     if [ -n "$snapshot_ids" ]; then
         for snap_id in $snapshot_ids; do
             if [ -n "$snap_id" ]; then
@@ -54,6 +55,7 @@ if [ ! -z "$BACKEND_AMI_ID" ]; then
         --output text 2>/dev/null)
 
     aws ec2 deregister-image --image-id $BACKEND_AMI_ID
+    
     if [ -n "$snapshot_ids" ]; then
         for snap_id in $snapshot_ids; do
             if [ -n "$snap_id" ]; then

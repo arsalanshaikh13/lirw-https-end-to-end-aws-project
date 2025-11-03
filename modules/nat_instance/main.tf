@@ -127,13 +127,13 @@ resource "aws_security_group" "nat_ec2_sg" {
 
 # # Add route for private subnet traffic through NAT instance
 resource "aws_route" "nat_ec2_route" {
-    route_table_id         = module.vpc.pri_rt_a_id
+    route_table_id         = var.pri_rt_a_id
     destination_cidr_block = "0.0.0.0/0"
     network_interface_id   = aws_instance.nat_ec2_instance.primary_network_interface_id
 }
 
 resource "aws_route" "nat_ec2_route1" {
-    route_table_id         = module.vpc.pri_rt_b_id
+    route_table_id         = var.pri_rt_b_id
     destination_cidr_block = "0.0.0.0/0"
     network_interface_id   = aws_instance.nat_ec2_instance.primary_network_interface_id
 }

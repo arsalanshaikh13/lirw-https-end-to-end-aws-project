@@ -157,7 +157,7 @@ resource "aws_iam_policy" "cloudwatch_agent_policy" {
 # }
 
 
-
+# https://ryandeangraham.medium.com/terraforming-vpc-flow-logs-0b9defb03d67 - ryan graham vpc flow logs
 # VPC Flow logs
 # 1. Create an S3 bucket for storing VPC Flow Logs
 resource "aws_s3_bucket" "vpc_flow_logs_bucket" {

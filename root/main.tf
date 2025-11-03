@@ -8,6 +8,14 @@
 # harishnshetty - https://www.youtube.com/watch?v=M6BxKpSvWa4
 # https://github.com/harishnshetty/3-tier-aws-15-services
 # harishnshetty : How to Create a Scalable 3 Tier AWS Project | Secret Manager, Route53, & High Availability +15 Srv - https://www.youtube.com/watch?v=wPrktKBkBQk&t=2s
+
+# https://www.youtube.com/watch?v=pdwGsM2MmDU&t=1s - Securing a ALB with CloudFront, Enabling HTTPS, SSL Termination & Restricting Direct Access to a ALB
+# Hands-On With Digital Den
+
+# https://www.youtube.com/watch?v=6rsJlfpwnP4&list=PLcWsizQR0OZAX5pMLiEkzHpLUetKzKYFY&index=6 - Deploy a Production-Grade 3-Tier Architecture on AWS | CloudFront, ALB, ASG, EC2, RDS, CloudWatch
+#Learn It Right Way
+# https://github.com/Learn-It-Right-Way/lirw-react-node-mysql-app/tree/feature/add-logging
+
 module "vpc" {
   source          = "../modules/vpc"
   region          = var.region

@@ -54,7 +54,7 @@ variable "client_key_name" {
 }
 variable "key_file_path" {
   type        = string
-  default     = "../../modules/key/client_key"
+  default     = "../../terraform/permissions/modules/key/client_key"
   description = " key file path"
 }
 
@@ -85,12 +85,12 @@ source "amazon-ebs" "frontend" {
   associate_public_ip_address   = true
   temporary_key_pair_name       = "packer-${local.timestamp}"
   ssh_username                  = var.ssh_username
-  ssh_interface                 = "public_ip"
   ssh_timeout                   = "6m"
   ssh_handshake_attempts        = 30
   communicator                  = "ssh"
   ssh_pty                       = true
-  # ssh_interface    = "session_manager"
+  # ssh_interface                 = "public_ip"
+  ssh_interface    = "session_manager"
   ssh_keypair_name     = var.client_key_name
   ssh_private_key_file = var.key_file_path
 

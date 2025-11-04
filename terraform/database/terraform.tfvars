@@ -1,0 +1,5 @@
+db_username            = "admin_3_tier"
+db_password            = "Asd1-CaPQ22"
+db_name                = "lirw_react_node_app"
+terraform_state_bucket = "lirw-backend"
+region                 = "us-east-1"

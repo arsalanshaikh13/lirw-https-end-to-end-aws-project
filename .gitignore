@@ -66,3 +66,4 @@ plan.*
 *.tfstate.*
 env.sh
 *.log
+try.sh

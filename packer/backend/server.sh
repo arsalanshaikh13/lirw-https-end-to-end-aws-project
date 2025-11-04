@@ -21,7 +21,7 @@ set -euxo pipefail
 # sudo su - ec2-user
 echo "${bucket_name} name of the bucket"
 # COPY APP CODE
-cd /home/ec2-user
+sudo -u ec2-user cd /home/ec2-user
 aws s3 cp s3://${bucket_name}/lirw-three-tier/backend backend --recursive
 
 # no secret name since we are using ssm parameter store

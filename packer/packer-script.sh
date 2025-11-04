@@ -22,4 +22,3 @@ else
     ./build_ami.sh
 fi
 
-cd ../../root

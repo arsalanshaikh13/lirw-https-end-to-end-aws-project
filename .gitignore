@@ -67,3 +67,5 @@ plan.*
 env.sh
 *.log
 try.sh
+root
+modules

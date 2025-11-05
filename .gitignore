@@ -65,7 +65,7 @@ plan.*
 /**/*.tfstate*
 *.tfstate.*
 env.sh
-*.log
+*.log*
 try.sh
 root
 modules

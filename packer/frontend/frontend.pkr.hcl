@@ -120,40 +120,58 @@ source "amazon-ebs" "frontend" {
 build {
   sources = ["source.amazon-ebs.frontend"]
 
-  # provisioner "shell" {
-  #   inline = [
-  #     "sudo dnf update -y",
-  #     "sudo dnf install -y nginx git"
-  #   ]
-  # }
 
+  
   # provisioner "file" {
-  #   source      = "nginx.conf"
-  #   destination = "/tmp/nginx.conf"
+  #   source      = "client.sh"           # local file (in same dir as packer/terraform)
+  #   destination = "/tmp/client.sh"      # remote path inside EC2
   # }
 
   # provisioner "shell" {
+  #   environment_vars = [
+  #     "bucket_name=${var.bucket_name}",
+  #     "internal_alb_dns_name=${var.internal_alb_dns_name}"
+  # ]
+
   #   inline = [
-  #     "sudo mv /tmp/nginx.conf /etc/nginx/nginx.conf"
+  #     "echo $internal_alb_dns_name  $bucket_name  ",
+  #     "echo 'Running app-tier setup...'",
+  #     "sudo chmod +x /tmp/client.sh",
+  #     "sudo -E bash /tmp/client.sh "
   #   ]
   # }
-  provisioner "file" {
-    source      = "client.sh"           # local file (in same dir as packer/terraform)
-    destination = "/tmp/client.sh"      # remote path inside EC2
-  }
 
+  # Step 1: Install Ansible
   provisioner "shell" {
-    environment_vars = [
-      "bucket_name=${var.bucket_name}",
-      "internal_alb_dns_name=${var.internal_alb_dns_name}"
-  ]
-
     inline = [
-      "echo $internal_alb_dns_name  $bucket_name  ",
-      "echo 'Running app-tier setup...'",
-      "sudo chmod +x /tmp/client.sh",
-      "sudo -E bash /tmp/client.sh "
+      "echo 'Installing Ansible on EC2 builder instance...'",
+      "sudo yum update -y",
+      "sudo yum install -y ansible ",
+      # "sudo yum install -y python3-pip",
+      # "sudo pip3 install ansible --break-system-packages || sudo yum install -y ansible",
+      "ansible --version"
     ]
+  }
+  
+
+    provisioner "file" {
+    source      = "client-ansible.yml"           # local file (in same dir as packer/terraform)
+    destination = "/tmp/client-ansible.yml"      # remote path inside EC2
+  }
+   # Run Ansible playbook instead of shell script
+  provisioner "ansible" {
+    playbook_file = "./client-ansible.yml"
+    user             = "ec2-user"
+    timeout       = "5m"
+    # variables passed into Ansible
+    extra_arguments = [
+      "-vvvv",
+      "--extra-vars", 
+      "ansible_python_interpreter=/usr/bin/python3 bucket_name=${var.bucket_name} internal_alb_dns_name=${var.internal_alb_dns_name}"
+    ]
+
+    # Optional verbosity (remove if you prefer)
+    ansible_env_vars = ["ANSIBLE_FORCE_COLOR=true"]
   }
   post-processor "manifest" {
     output = "manifest.json"

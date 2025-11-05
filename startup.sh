@@ -1,5 +1,5 @@
-#!/usr/bin/bash
-set -exuo pipefail
+#!/bin/bash
+set -euo pipefail
 if [ "$#" -gt 0 ]; then
   terraform apply -target="$1"
   exit 1
@@ -160,23 +160,23 @@ echo "SSH key pairs setup completed"
 
 # convert CRLF to LF if needed
 # List of files to check
-files=("packer/backend/server.sh" "packer/frontend/client.sh")
+# files=("packer/backend/server.sh" "packer/frontend/client.sh")
 
-# Loop through each file
-for file_to_check in "${files[@]}"; do
-    if grep -q $'\r' "$file_to_check"; then
-        echo "$file_to_check uses CRLF line endings"
-        echo "converting CRLF line endings to LF line endings for file $file_to_check"
-        dos2unix packer/backend/server.sh
-        dos2unix packer/frontend/client.sh
+# # Loop through each file
+# for file_to_check in "${files[@]}"; do
+#     if grep -q $'\r' "$file_to_check"; then
+#         echo "$file_to_check uses CRLF line endings"
+#         echo "converting CRLF line endings to LF line endings for file $file_to_check"
+#         dos2unix packer/backend/server.sh
+#         dos2unix packer/frontend/client.sh
 
-    else
-        echo "$file_to_check uses LF line endings"
-    fi
-done
+#     else
+#         echo "$file_to_check uses LF line endings"
+#     fi
+# done
 
 cd terraform
-
+# rm -f compute/modules/asg/ami_ids/front*
 # Path to the parent folder
 # parent_dir="terraform"
 parent_dir=("network" "permissions" "database" "compute" "hosting")
@@ -191,7 +191,8 @@ count=0
 # for folder in "$parent_dir"/*; do
 for folder in "${parent_dir[@]}"; do
   # if [[ "$folder" == "network" ]]; then
-  if [[ "$folder" == "network" || "$folder" == "permissions" || "$folder" == "database" || "$folder" == "compute"  ]]; then
+  if [[ "$folder" == "network" || "$folder" == "permissions" || "$folder" == "database" ]]; then
+  # # if [[ "$folder" == "network" || "$folder" == "permissions" || "$folder" == "database" || "$folder" == "compute"  ]]; then
     echo "The folder is network."
     count=$((count + 1))
     continue
@@ -208,10 +209,10 @@ for folder in "${parent_dir[@]}"; do
       print_section "${print_line[$count]}"
       
          
-      # terraform force-unlock  e1c2ae9c-176a-2ce3-48b3-673189635e65
+      # terraform force-unlock 983ca4af-e7fc-a99c-f8a7-c7151b24d5c3
       # Perform the operation you need
       # source env.sh
-      if [ ! -f ".terraform.lock*" ]; then
+      if [ ! -f ".terraform.lock.hcl" ]; then
         terraform init -reconfigure
         terraform fmt
         terraform validate
@@ -225,8 +226,10 @@ for folder in "${parent_dir[@]}"; do
 
         # terraform graph > graph/graph-lirw-2.txt
       fi
-      # terraform apply -auto-approve -parallelism=20 -refresh=false
-      terraform apply -auto-approve -parallelism=20 
+      # terraform force-unlock 7f938aaf-f9e0-8fe7-13f9-f38a295dc7bc 
+      # terraform destroy -target=null_resource.build_ami -auto-approve 
+      terraform apply -auto-approve -parallelism=20 -refresh=false
+      # terraform apply -auto-approve -parallelism=20 
       terraform graph > graph/graph2.txt
 
       
@@ -246,4 +249,4 @@ for folder in "${parent_dir[@]}"; do
 done
 
 
-# ./startup.sh 2>&1 | tee >(sed 's/\x1b\[[0-9;]*m//g' > logs/setupnew.log )
+# ./startup.sh 2>&1 | tee >(sed 's/\x1b\[[0-9;]*m//g' > logs/setupansible12.log )

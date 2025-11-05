@@ -160,22 +160,23 @@ resource "aws_vpc_endpoint" "s3_gateway_vpc_flow_logs" {
 
 
 
-data "local_file" "frontend_ami" {
-  filename = "${path.module}/ami_ids/frontend_ami.txt"
-}
+# data "local_file" "frontend_ami" {
+#   filename = "${path.module}/ami_ids/frontend_ami.txt"
+# }
 
-data "local_file" "backend_ami" {
-  filename = "${path.module}/ami_ids/backend_ami.txt"
-}
-locals {
-  frontend_ami_id = trimspace(data.local_file.frontend_ami.content)
-  backend_ami_id  = trimspace(data.local_file.backend_ami.content)
-}
+# data "local_file" "backend_ami" {
+#   filename = "${path.module}/ami_ids/backend_ami.txt"
+# }
+# locals {
+#   frontend_ami_id = trimspace(data.local_file.frontend_ami.content)
+#   backend_ami_id  = trimspace(data.local_file.backend_ami.content)
+# }
 
 resource "aws_launch_template" "lt_name" {
   name          = "${var.project_name}-tpl"
   # image_id      = data.aws_ami.latest_amazon_linux.id
-  image_id      = local.frontend_ami_id
+  # image_id      = local.frontend_ami_id
+  image_id      = "ami-0edf51c51a61dfff5"
   # image_id      = var.frontend_ami_id
   instance_type = var.cpu
   key_name      = var.client_key_name
@@ -229,7 +230,8 @@ resource "aws_launch_template" "lt_name" {
 resource "aws_launch_template" "server_lt_name" {
   name          = "${var.project_name}-server_tpl"
   # image_id      = data.aws_ami.latest_amazon_linux.id
-  image_id      = local.backend_ami_id
+  # image_id      = local.backend_ami_id
+  image_id      = "ami-019bd69da8b7f13a8"
   # image_id      = var.backend_ami_id
   instance_type = var.cpu
   key_name      = var.server_key_name

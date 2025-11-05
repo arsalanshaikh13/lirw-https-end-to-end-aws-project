@@ -19,6 +19,7 @@ resource "null_resource" "build_ami" {
   depends_on = [module.alb]
 
   provisioner "local-exec" {
+    interpreter = ["/bin/bash", "-c"]
     environment = {
       VPC_ID    = data.terraform_remote_state.network.outputs.vpc_id
       SUBNET_ID = data.terraform_remote_state.network.outputs.pub_sub_1a_id
@@ -31,24 +32,53 @@ resource "null_resource" "build_ami" {
       RDS_SG_ID                       = data.terraform_remote_state.network.outputs.db_sg_id
       s3_ssm_cw_instance_profile_name = data.terraform_remote_state.permissions.outputs.s3_ssm_cw_instance_profile_name
       # db_secret_name                  = module.aws_secret.db_secret_name
-      internal_alb_dns_name = module.alb.internal_alb_dns_name
-      bucket_name           = data.terraform_remote_state.network.outputs.lirw_bucket_name
-      aws_region            = data.terraform_remote_state.network.outputs.region
-
+      internal_alb_dns_name   = module.alb.internal_alb_dns_name
+      bucket_name             = data.terraform_remote_state.network.outputs.lirw_bucket_name
+      aws_region              = data.terraform_remote_state.network.outputs.region
+      ANSIBLE_STDOUT_CALLBACK = "yaml"
     }
-    command = "bash ../../packer/packer-script.sh"
+    # command = "bash ../../packer/packer-script.sh"
+    # 👇 Run Ansible playbook instead of shell script
+    # command = "ansible-playbook ../../packer/packer-ansible.yml -vv"
+    # command = "ansible-playbook ../../packer/packer-ansible.yml -vvvv 2>&1 | tee -a ../../packer/ansible_output.log"
+    # on_failure = fail
+
+    # Add explicit error handling in the command
+    # command = <<-EOT
+    #   {
+    #     set -euo pipefail  # Exit on any error
+    #     ansible-playbook ../../packer/packer-ansible.yml -vvvv 2>&1 | tee -a ../../packer/ansible_output.log
+    #     exit_code=$${PIPESTATUS[0]}
+    #     if [ $$exit_code -ne 0 ]; then
+    #       echo "❌ Ansible playbook failed with exit code $$exit_code"
+    #       exit $$exit_code
+    #     fi
+    #     echo "✅ Ansible playbook completed successfully"      
+    #   }
+    # EOT
+    command    = "chmod +x null_resource.sh && ./null_resource.sh"
+    on_failure = fail
   }
-  #   triggers = {
-  #   # Change any of these to force rebuild
-  #   server_build = filemd5("${path.module}/../packer/backend/build_ami.sh")
-  #   server_script = filemd5("${path.module}/../packer/backend/server.sh")
-  #   client_build = filemd5("${path.module}/../packer/frontend/build_ami.sh")
-  #   client_script = filemd5("${path.module}/../packer/frontend/client.sh")
-  #   # # Or manual trigger
-  #   # force_rebuild = var.backend_ami_version  # Change this value to rebuild
-  #   # force_rebuild = var.frontend_ami_version  # Change this value to rebuild
+
+  # # Optional: Add a destroy provisioner to clean up on failure
+  # provisioner "local-exec" {
+  #   when    = destroy
+  #   command = "echo 'Cleaning up failed AMI build resources...'"
   # }
 }
+#   triggers = {
+# ensure re-run when packer template changes
+# packer_template_hash = filesha256("../../packer/backend.pkr.hcl")
+#   # Change any of these to force rebuild
+#   server_build = filemd5("${path.module}/../packer/backend/build_ami.sh")
+#   server_script = filemd5("${path.module}/../packer/backend/server.sh")
+#   client_build = filemd5("${path.module}/../packer/frontend/build_ami.sh")
+#   client_script = filemd5("${path.module}/../packer/frontend/client.sh")
+#   # # Or manual trigger
+#   # force_rebuild = var.backend_ami_version  # Change this value to rebuild
+#   # force_rebuild = var.frontend_ami_version  # Change this value to rebuild
+# }
+
 
 # data "local_file" "packer_manifest_backend" {
 #   filename   = "../packer/backend/manifest.json"

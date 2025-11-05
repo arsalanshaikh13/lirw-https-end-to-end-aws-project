@@ -98,49 +98,56 @@ print_section() {
 
     # Path to the parent folder
     # parent_dir="terraform"
+    # parent_dir=( "permissions" "network"  )
     parent_dir=("hosting" "compute" "database" "permissions" "network")
     print_line=("Destroying cloudfront, route53 modules"
                 "Destroying alb, asg modules"
                 "Destroying database, ssm_param modules"
                 "Destroying iam_role, acm, key_pair modules"
                 "Destroying VPC, security_group, s3 modules") 
-
+    
     count=0
     # Loop through each folder inside the terraform directory
     # for folder in "$parent_dir"/*; do
     for folder in "${parent_dir[@]}"; do
-    # if [[ "$folder" == "network" ]]; then
-    #   if [[ "$folder" == "network" || "$folder" == "permissions"  ]]; then
-    #     echo "The folder is network."
-    #     count=$((count + 1))
-    #     continue
-    #   fi
-    if [ -d "$folder" ]; then
-        # Start a subshell
-        (
-        echo "Performing operation in $folder"
-        
-        # Change into the folder
-        cd "$folder" || exit
-        
-        # Print the line from the array
-        print_section "${print_line[$count]}"
-        
-        terraform destroy -auto-approve -parallelism=20
-        
-        # Go back to the parent directory
-        # cd - || exit # no need for this since i am running a subshell
+        if [[ "$folder" == "hosting" || "$folder" == "compute" ]]; then
+        # #   if [[ "$folder" == "network" || "$folder" == "permissions"  ]]; then
+        # #     echo "The folder is network."
+            count=$((count + 1))
+            continue
+        #     echo "destroying database"
+        #     cd $folder
+        #     terraform destroy  -auto-approve -parallelism=20
+        #     exit 1
 
-        ) # Subshell exits, you are automatically back in $parent_dir
-        # # Increment count
-        count=$((count + 1))
-
-        # # Check if we've exhausted the array
-        if [ $count -ge ${#print_line[@]} ]; then
-        echo "count greater than print_line array"
-        break
         fi
-    fi
+        if [ -d "$folder" ]; then
+            # Start a subshell
+            (
+            echo "Performing operation in $folder"
+            
+            # Change into the folder
+            cd "$folder" || exit
+            
+            # Print the line from the array
+            print_section "${print_line[$count]}"
+            # terraform force-unlock bc03bcab-9965-32d0-1232-325bd9d00a89
+
+            terraform destroy -auto-approve -parallelism=20
+            
+            # Go back to the parent directory
+            # cd - || exit # no need for this since i am running a subshell
+
+            ) # Subshell exits, you are automatically back in $parent_dir
+            # # Increment count
+            count=$((count + 1))
+
+            # # Check if we've exhausted the array
+            if [ $count -ge ${#print_line[@]} ]; then
+            echo "count greater than print_line array"
+            break
+            fi
+        fi
     done
 ) # subshell started
 

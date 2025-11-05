@@ -1,0 +1,84 @@
+---
+- name: Build Frontend AMI using Packer and Terraform
+  hosts: localhost
+  connection: local
+  gather_facts: false
+
+  vars:
+    # terraform_network_dir: "../../terraform/network"
+    terraform_permissions_dir: "../../terraform/permissions"
+    ami_output_dir: "../../terraform/compute/modules/asg/ami_ids"
+    packer_file: "frontend.pkr.hcl"
+    instance_type: "t4g.small"
+    ssh_username: "ec2-user"
+    bucket_name: "{{ lookup('env', 'bucket_name') }}"
+    internal_alb_dns_name: "{{ lookup('env', 'internal_alb_dns_name') }}"
+    aws_region: "{{ lookup('env', 'aws_region') }}"
+    VPC_ID: "{{ lookup('env', 'VPC_ID') }}"
+    SUBNET_ID: "{{ lookup('env', 'SUBNET_ID') }}"
+    s3_ssm_cw_instance_profile_name: "{{ lookup('env', 's3_ssm_cw_instance_profile_name') }}"
+
+  tasks:
+    - name: Ensure AMI output directory exists
+      file:
+        path: "{{ ami_output_dir }}"
+        state: directory
+        mode: "0755"
+
+    - name: Initialize Packer plugins
+      command: packer init .
+      args:
+        chdir: "{{ playbook_dir }}"
+
+    - name: Get client key name from Terraform output
+      command: terraform -chdir={{ terraform_permissions_dir }} output -raw client_key_name
+      register: client_key_output
+      changed_when: false
+
+    - name: Show client key name value
+      debug:
+        msg: "The client key name is {{ client_key_output.stdout }}"
+
+    # ---- AWS AMI Discovery ----
+    - name: Get latest Amazon Linux 2023 AMI ID
+      command: >
+        aws ec2 describe-images
+        --owners amazon
+        --filters "Name=name,Values=al2023-ami-2023.*-arm64" "Name=state,Values=available"
+        --query "sort_by(Images, &CreationDate)[-1].ImageId"
+        --output text
+      register: source_ami_output
+      changed_when: false
+
+    - name: Display selected source AMI
+      debug:
+        msg: "Using latest Amazon Linux 2023 AMI: {{ source_ami_output.stdout }}"
+
+    # ---- Packer Build ----
+    - name: Build Frontend AMI with Packer
+      shell: |
+        PACKER_LOG=1 PACKER_LOG_PATH=packer.log \
+        packer build \
+          -var "aws_region={{ aws_region }}" \
+          -var "source_ami={{ source_ami_output.stdout }}" \
+          -var "instance_type={{ instance_type }}" \
+          -var "vpc_id={{ VPC_ID }}" \
+          -var "ssh_username={{ ssh_username }}" \
+          -var "subnet_id={{ SUBNET_ID }}" \
+          -var "s3_ssm_cw_instance_profile_name={{ s3_ssm_cw_instance_profile_name }}" \
+          -var "bucket_name={{ bucket_name }}" \
+          -var "internal_alb_dns_name={{ internal_alb_dns_name }}" \
+          -var "client_key_name={{ client_key_output.stdout }}" \
+          {{ packer_file }} | tee >(grep -Eo 'ami-[a-z0-9]{17}' | tail -n1 > {{ ami_output_dir }}/frontend_ami.txt)
+      args:
+        executable: /bin/bash
+        chdir: "{{ playbook_dir }}"
+
+    - name: Display saved AMI ID
+      shell: cat {{ ami_output_dir }}/frontend_ami.txt
+      register: ami_id
+      changed_when: false
+
+    - name: Show final AMI ID
+      debug:
+        msg: "Frontend AMI successfully built and saved: {{ ami_id.stdout }}"

@@ -1,0 +1,208 @@
+---
+- name: Build backend AMI using Packer
+  hosts: localhost
+  # hosts: all
+  connection: local
+  gather_facts: false
+
+  vars:
+    # aws_region: "us-east-1"
+    instance_type: "t4g.small"
+    # db_port: "3306"
+    packer_log_path: "packer.log"
+    ami_output_dir: "../../terraform/compute/modules/asg/ami_ids"
+    packer_template: "backend.pkr.hcl"
+
+    VPC_ID: "{{ lookup('env', 'VPC_ID') }}"
+    SUBNET_ID: "{{ lookup('env', 'SUBNET_ID') }}"
+    DB_HOST: "{{ lookup('env', 'DB_HOST') }}"
+    DB_PORT: "{{ lookup('env', 'DB_PORT') }}"
+    DB_USER: "{{ lookup('env', 'DB_USER') }}"
+    DB_PASSWORD: "{{ lookup('env', 'DB_PASSWORD') }}"
+    DB_NAME: "{{ lookup('env', 'DB_NAME') }}"
+    RDS_SG_ID: "{{ lookup('env', 'RDS_SG_ID') }}"
+    s3_ssm_cw_instance_profile_name: "{{ lookup('env', 's3_ssm_cw_instance_profile_name') }}"
+    bucket_name: "{{ lookup('env', 'bucket_name') }}"
+    aws_region: "{{ lookup('env', 'aws_region') }}"
+
+    # environment:
+    #   AWS_REGION: "{{ aws_region }}"
+
+  tasks:
+    - name: Redirect output to log file using tee
+      shell: set -exuo pipefail
+      args:
+        executable: /bin/bash
+      ignore_errors: no # Make sure to fail the task if something goes wrong
+
+    - name: Initialize Packer plugins
+      ansible.builtin.command: packer init .
+      args:
+        chdir: "{{ playbook_dir }}"
+
+    - name: Display variable values
+      ansible.builtin.debug:
+        msg:
+          - "VPC_ID: {{ VPC_ID }}"
+          - "SUBNET_ID: {{ SUBNET_ID }}"
+          - "DB_HOST: {{ DB_HOST }}"
+          - "DB_PORT: {{ DB_PORT }}"
+          - "DB_USER: {{ DB_USER }}"
+          - "RDS_SG_ID: {{ RDS_SG_ID }}"
+          # - "Server key: {{ server_key_name | default('undefined') }}"
+
+    - name: Ensure required variables are set
+      ansible.builtin.fail:
+        msg: "Missing one or more required vars: VPC_ID, SUBNET_ID, DB_HOST, DB_USER, DB_PASSWORD, RDS_SG_ID"
+      when:
+        - VPC_ID is not defined or VPC_ID | length == 0
+        - SUBNET_ID is not defined or SUBNET_ID | length == 0
+        - DB_HOST is not defined or DB_HOST | length == 0
+        - DB_USER is not defined or DB_USER | length == 0
+        - DB_PASSWORD is not defined or DB_PASSWORD | length == 0
+        - RDS_SG_ID is not defined or RDS_SG_ID | length == 0
+
+    - name: Create security group for Packer
+      ansible.builtin.command: >
+        aws ec2 create-security-group
+        --group-name "packer-sg-{{ lookup('pipe', 'date +%s') }}"
+        --description "Security group for Packer build"
+        --vpc-id "{{ VPC_ID }}"
+        --query 'GroupId'
+        --output text
+      register: packer_sg
+      changed_when: true
+
+    - name: Set fact for PACKER_SG_ID
+      ansible.builtin.set_fact:
+        PACKER_SG_ID: "{{ packer_sg.stdout }}"
+
+    - name: Add inbound SSH rule
+      ansible.builtin.command: >
+        aws ec2 authorize-security-group-ingress
+        --group-id "{{ PACKER_SG_ID }}"
+        --protocol tcp --port 22 --cidr 0.0.0.0/0
+      changed_when: true
+
+    - name: Allow Packer SG to access RDS
+      ansible.builtin.command: >
+        aws ec2 authorize-security-group-ingress
+        --group-id "{{ RDS_SG_ID }}"
+        --protocol tcp --port 3306
+        --source-group "{{ PACKER_SG_ID }}"
+      changed_when: true
+
+    - name: Get latest Amazon Linux 2023 AMI
+      ansible.builtin.command: >
+        aws ec2 describe-images
+        --owners amazon
+        --filters "Name=name,Values=al2023-ami-2023.*-arm64" "Name=state,Values=available"
+        --query "sort_by(Images, &CreationDate)[-1].ImageId"
+        --output text
+      register: source_ami
+
+    - name: Create AMI output directory
+      ansible.builtin.file:
+        path: "{{ ami_output_dir }}"
+        state: directory
+        mode: "0755"
+
+    - name: Get the server_key_name from Terraform output
+      shell: terraform -chdir=../../terraform/permissions output -raw server_key_name
+      register: server_key_name
+      changed_when: false # to avoid marking it as a change if it's idempotent
+
+    - name: Show server_key_name value
+      debug:
+        msg: "The server key name is {{ server_key_name.stdout }}"
+
+    - block:
+        - name: Run packer build
+          ansible.builtin.shell: |
+            PACKER_LOG=1 PACKER_LOG_PATH={{ packer_log_path }} packer build  \
+              -var "aws_region={{ aws_region }}" \
+              -var "source_ami={{ source_ami.stdout }}" \
+              -var "instance_type={{ instance_type }}" \
+              -var "vpc_id={{ VPC_ID }}" \
+              -var "subnet_id={{ SUBNET_ID }}" \
+              -var "ssh_username=ec2-user" \
+              -var "db_host={{ DB_HOST }}" \
+              -var "db_port={{ DB_PORT }}" \
+              -var "db_user={{ DB_USER }}" \
+              -var "db_name={{ DB_NAME }}" \
+              -var "db_password={{ DB_PASSWORD }}" \
+              -var "security_group_id={{ PACKER_SG_ID }}" \
+              -var "s3_ssm_cw_instance_profile_name={{ s3_ssm_cw_instance_profile_name }}" \
+              -var "bucket_name={{ bucket_name }}" \
+              -var "server_key_name={{ server_key_name.stdout }}" \
+              {{ packer_template }} | tee >(grep -Eo 'ami-[a-z0-9]{17}' | tail -n1 > {{ ami_output_dir }}/backend_ami.txt)
+          args:
+            chdir: "{{ playbook_dir }}"
+            executable: /bin/bash
+          # changed_when: true
+
+        - name: Display saved AMI ID
+          shell: cat {{ ami_output_dir }}/backend_ami.txt
+          register: ami_id
+          changed_when: false
+
+        - name: Show final AMI ID
+          debug:
+            msg: "Backend AMI successfully built and saved: {{ ami_id.stdout }}"
+
+    - always:
+        - name: Remove RDS access rule
+          ansible.builtin.command: >
+            aws ec2 revoke-security-group-ingress
+            --group-id "{{ RDS_SG_ID }}"
+            --protocol tcp --port 3306
+            --source-group "{{ PACKER_SG_ID }}"
+          ignore_errors: yes
+          when: PACKER_SG_ID is defined
+
+        - name: Delete temporary Packer security group
+          ansible.builtin.command: >
+            aws ec2 delete-security-group --group-id "{{ PACKER_SG_ID }}"
+          ignore_errors: yes
+          when: PACKER_SG_ID is defined
+
+    # - name: Run packer build
+    #   ansible.builtin.shell: |
+    #     PACKER_LOG=1 PACKER_LOG_PATH={{ packer_log_path }} packer build \
+    #       -var "aws_region={{ aws_region }}" \
+    #       -var "source_ami={{ source_ami.stdout }}" \
+    #       -var "instance_type={{ instance_type }}" \
+    #       -var "vpc_id={{ VPC_ID }}" \
+    #       -var "subnet_id={{ SUBNET_ID }}" \
+    #       -var "ssh_username=ec2-user" \
+    #       -var "db_host={{ DB_HOST }}" \
+    #       -var "db_port={{ DB_PORT }}" \
+    #       -var "db_user={{ DB_USER }}" \
+    #       -var "db_name={{ DB_NAME }}" \
+    #       -var "db_password={{ DB_PASSWORD }}" \
+    #       -var "security_group_id={{ PACKER_SG_ID }}" \
+    #       -var "s3_ssm_cw_instance_profile_name={{ s3_ssm_cw_instance_profile_name }}" \
+    #       -var "bucket_name={{ bucket_name }}" \
+    #       -var "server_key_name={{ server_key_name }}" \
+    #       {{ packer_template }} | tee >(grep -Eo 'ami-[a-z0-9]{17}' | tail -n1 > {{ ami_output_dir }}/backend_ami.txt)
+    #   args:
+    #     chdir: "{{ playbook_dir }}"
+    #     executable: /bin/bash # /bin/sh by default by ansible
+    #   changed_when: true
+
+    # # Cleanup section runs always (like trap cleanup EXIT)
+    # always:
+    #   - name: Remove RDS access rule
+    #     ansible.builtin.command: >
+    #       aws ec2 revoke-security-group-ingress
+    #       --group-id "{{ RDS_SG_ID }}"
+    #       --protocol tcp --port 3306
+    #       --source-group "{{ PACKER_SG_ID }}"
+    #     ignore_errors: yes
+    #     when: PACKER_SG_ID is defined
+
+    #   - name: Delete temporary Packer security group
+    #     ansible.builtin.command: >
+    #       aws ec2 delete-security-group --group-id "{{ PACKER_SG_ID }}"
+    #     ignore_errors: yes
+    #     when: PACKER_SG_ID is defined

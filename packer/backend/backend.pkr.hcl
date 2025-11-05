@@ -175,49 +175,82 @@ source "amazon-ebs" "backend" {
 build {
   sources = ["source.amazon-ebs.backend"]
 
+  # provisioner "file" {
+  #   source      = "server.sh"           # local file (in same dir as packer/terraform)
+  #   destination = "/tmp/server.sh"      # remote path inside EC2
+  # }
+
   # provisioner "shell" {
+  #   environment_vars = [
+  #     "db_host=${var.db_host}",
+  #     "db_username=${var.db_user}",
+  #     "db_password=${var.db_password}",
+  #     "db_name=${var.db_name}",
+  #     "bucket_name=${var.bucket_name}",
+  #     "aws_region=${var.aws_region}"
+  # ]
+
   #   inline = [
-  #     "sudo dnf upgrade -y",
-  #     "sudo dnf install -y httpd wget php-fpm php-mysqli php-json php php-devel -y",
-  #     "sudo dnf install mariadb105 -y",
-  #     "sudo usermod -a -G apache ec2-user",
-  #     "sudo chown -R ec2-user:apache /var/www",
-  #     "sudo chmod 2775 /var/www && find /var/www -type d -exec sudo chmod 2775 {} \\;",
-  #     "find /var/www -type f -exec sudo chmod 0664 {} \\;",
-  #     "sudo systemctl enable httpd",
-  #     "sudo dnf install git -y"
+  #     "echo 'Running lirw-app setup...'",
+  #     "echo $db_name ",
+  #     "echo Bucket: $bucket_name",
+  #     "sudo chmod +x /tmp/server.sh",
+  #     "sudo -E bash -x /tmp/server.sh "    
   #   ]
   # }
-#   provisioner "shell" {
-#   inline = [
-#     "echo 'Starting app-tier setup...'",
-#     "sudo bash -c 'cat <<EOF > /tmp/server.sh\n${file("server.sh")}\nEOF'",
-#     "sudo chmod +x /tmp/app-setup.sh",
-#     "sudo bash /tmp/app-setup.sh"
-#   ]
-# }
 
-  provisioner "file" {
-    source      = "server.sh"           # local file (in same dir as packer/terraform)
-    destination = "/tmp/server.sh"      # remote path inside EC2
-  }
-
+  # Step 1: Install Ansible
   provisioner "shell" {
-    environment_vars = [
-      "db_host=${var.db_host}",
-      "db_username=${var.db_user}",
-      "db_password=${var.db_password}",
-      "db_name=${var.db_name}",
-      "bucket_name=${var.bucket_name}",
-      "aws_region=${var.aws_region}"
-  ]
-
     inline = [
-      "echo 'Running lirw-app setup...'",
-      "echo $db_name ",
-      "echo Bucket: $bucket_name",
-      "sudo chmod +x /tmp/server.sh",
-      "sudo -E bash -x /tmp/server.sh "    
+      "echo 'Installing Ansible on EC2 builder instance...'",
+      "sudo yum update -y",
+      "sudo yum install -y ansible ",
+      # "sudo yum install -y python3-pip",
+      # "sudo pip3 install ansible --break-system-packages || sudo yum install -y ansible",
+      "ansible --version"
+    ]
+  }
+  # not needed
+  # provisioner "file" {
+  #   source      = "server-ansible.yml"           # local file (in same dir as packer/terraform)
+  #   destination = "/tmp/server-ansible.yml"      # remote path inside EC2
+  # }
+  # provisioner "shell" {
+  #   inline = [
+  #     "echo 'Checking if playbook file was copied...'",
+  #     "ls -l /tmp/server-ansible.yml || (echo 'File missing!' && exit 1)"
+  #   ]
+  # }
+
+
+  # Run Ansible playbook
+  # provisioner "ansible" {
+  #   playbook_file = "/tmp/server-ansible.yml"
+  #   # user          = var.ssh_username
+  #   # use_proxy     = false
+  #   # If using Session Manager communicator, disable SSH checks
+  #   # extra_arguments = [
+  #   #   "--extra-vars",
+  #   #   "bucket_name=${var.bucket_name} db_host=${var.db_host} db_username=${var.db_user} db_password=${var.db_password} db_name=${var.db_name} aws_region=${var.aws_region}"
+  #   # ]
+  #   extra_arguments = [
+  #     "--extra-vars", "bucket_name=${var.bucket_name}",
+  #     "--extra-vars", "db_host=${var.db_host}",
+  #     "--extra-vars", "db_username=${var.db_user}",
+  #     "--extra-vars", "db_password=${var.db_password}",
+  #     "--extra-vars", "db_name=${var.db_name}",
+  #     "--extra-vars", "aws_region=${var.aws_region}"
+  #   ]
+  # }
+  provisioner "ansible" {
+    # playbook_file    = "/tmp/server-ansible.yml"
+    playbook_file    = "./server-ansible.yml"
+    user             = "ec2-user"
+    timeout       = "5m"
+    extra_arguments  = [
+      "-vvvv",
+      "--extra-vars",
+      "ansible_python_interpreter=/usr/bin/python3 bucket_name=${var.bucket_name} db_host=${var.db_host} db_username=${var.db_user} db_password=${var.db_password} db_name=${var.db_name} aws_region=${var.aws_region}",
     ]
   }
 
@@ -238,3 +271,6 @@ build {
     output = "manifest.json"
   }
 }
+
+
+

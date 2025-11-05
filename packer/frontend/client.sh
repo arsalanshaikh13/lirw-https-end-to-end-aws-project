@@ -1,4 +1,5 @@
 #!/bin/bash
+exec > >(tee /var/log/user-data.log) 2>&1
 set -euo pipefail
 
 # bucket_name=$1

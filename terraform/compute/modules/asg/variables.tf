@@ -48,6 +48,10 @@ variable server_key_name {}
 variable pri_rt_a_id {}
 variable pri_rt_b_id {}
 
+variable "backend_ami_file" {}
+variable "frontend_ami_file" {}
+
+
 variable "email_address" {
   type        = list(string)
   description = "List of email addresses to receive email alert"

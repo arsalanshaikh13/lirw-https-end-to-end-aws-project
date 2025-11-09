@@ -1,0 +1,23 @@
+digraph G {
+  rankdir = "RL";
+  node [shape = rect, fontname = "sans-serif"];
+  subgraph "cluster_module.aws_ssm_param" {
+    label = "module.aws_ssm_param"
+    fontname = "sans-serif"
+    "module.aws_ssm_param.aws_ssm_parameter.db_host" [label="aws_ssm_parameter.db_host"];
+    "module.aws_ssm_param.aws_ssm_parameter.db_name" [label="aws_ssm_parameter.db_name"];
+    "module.aws_ssm_param.aws_ssm_parameter.db_password" [label="aws_ssm_parameter.db_password"];
+    "module.aws_ssm_param.aws_ssm_parameter.db_username" [label="aws_ssm_parameter.db_username"];
+  }
+  subgraph "cluster_module.rds" {
+    label = "module.rds"
+    fontname = "sans-serif"
+    "module.rds.aws_db_instance.lirw-database" [label="aws_db_instance.lirw-database"];
+    "module.rds.aws_db_subnet_group.db-subnet" [label="aws_db_subnet_group.db-subnet"];
+  }
+  "module.aws_ssm_param.aws_ssm_parameter.db_host" -> "module.rds.aws_db_instance.lirw-database";
+  "module.aws_ssm_param.aws_ssm_parameter.db_name" -> "module.rds.aws_db_instance.lirw-database";
+  "module.aws_ssm_param.aws_ssm_parameter.db_password" -> "module.rds.aws_db_instance.lirw-database";
+  "module.aws_ssm_param.aws_ssm_parameter.db_username" -> "module.rds.aws_db_instance.lirw-database";
+  "module.rds.aws_db_instance.lirw-database" -> "module.rds.aws_db_subnet_group.db-subnet";
+}

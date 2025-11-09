@@ -3,68 +3,114 @@ set -eo pipefail
 ( # subshell started
     #  1. Clean up AMIs
     # print_section "Cleaning up AMIs"
-    echo "Cleaning up AMIs"
+    # echo "Cleaning up AMIs"
 
-    # Get AMI IDs from the files if they exist
-    export AWS_REGION="us-east-1"
-    FRONTEND_AMI_ID=""
-    BACKEND_AMI_ID=""
+    # # Get AMI IDs from the files if they exist
+    # export AWS_REGION="us-east-1"
+    # FRONTEND_AMI_ID=""
+    # BACKEND_AMI_ID=""
 
-    if [ -f "terraform/compute/modules/asg/ami_ids/frontend_ami.txt" ]; then
-        FRONTEND_AMI_ID=$(cat terraform/compute/modules/asg/ami_ids/frontend_ami.txt)
-    fi
+    # if [ -f "terraform/compute/modules/asg/ami_ids/frontend_ami.txt" ]; then
+    #     FRONTEND_AMI_ID=$(cat terraform/compute/modules/asg/ami_ids/frontend_ami.txt)
+    # fi
 
-    if [ -f "terraform/compute/modules/asg/ami_ids/frontend_ami.txt" ]; then
-        BACKEND_AMI_ID=$(cat terraform/compute/modules/asg/ami_ids/backend_ami.txt)
-    fi
+    # if [ -f "terraform/compute/modules/asg/ami_ids/frontend_ami.txt" ]; then
+    #     BACKEND_AMI_ID=$(cat terraform/compute/modules/asg/ami_ids/backend_ami.txt)
+    # fi
 
-    # Deregister AMIs if they exist
-    if [ ! -z "$FRONTEND_AMI_ID" ]; then
-        echo "Deregistering Frontend AMI: $FRONTEND_AMI_ID"
+    # # Deregister AMIs if they exist
+    # if [ ! -z "$FRONTEND_AMI_ID" ]; then
+    #     echo "Deregistering Frontend AMI: $FRONTEND_AMI_ID"
 
-        echo "Finding and deleting associated snapshots..."
-        snapshot_ids=$(aws ec2 describe-images \
-            --image-ids "$FRONTEND_AMI_ID" \
-            --region "$AWS_REGION" \
-            --query "Images[0].BlockDeviceMappings[].Ebs.SnapshotId" \
-            --output text 2>/dev/null)
+    #     echo "Finding and deleting associated snapshots..."
+    #     snapshot_ids=$(aws ec2 describe-images \
+    #         --image-ids "$FRONTEND_AMI_ID" \
+    #         --region "$AWS_REGION" \
+    #         --query "Images[0].BlockDeviceMappings[].Ebs.SnapshotId" \
+    #         --output text 2>/dev/null)
 
-        aws ec2 deregister-image --image-id $FRONTEND_AMI_ID
-        if [ -n "$snapshot_ids" ]; then
-            for snap_id in $snapshot_ids; do
-                if [ -n "$snap_id" ]; then
-                    echo "Deleting snapshot: $snap_id"
-                    aws ec2 delete-snapshot --snapshot-id "$snap_id" --region "$AWS_REGION" || true
-                fi
-            done
-        fi
+    #     aws ec2 deregister-image --image-id $FRONTEND_AMI_ID
+    #     if [ -n "$snapshot_ids" ]; then
+    #         for snap_id in $snapshot_ids; do
+    #             if [ -n "$snap_id" ]; then
+    #                 echo "Deleting snapshot: $snap_id"
+    #                 aws ec2 delete-snapshot --snapshot-id "$snap_id" --region "$AWS_REGION" || true
+    #             fi
+    #         done
+    #     fi
         
-    else
-        echo "No Frontend AMI ID found, skipping deregistration"
-    fi
+    # else
+    #     echo "No Frontend AMI ID found, skipping deregistration"
+    # fi
 
-    if [ ! -z "$BACKEND_AMI_ID" ]; then
-        echo "Deregistering Backend AMI: $BACKEND_AMI_ID"
+    # if [ ! -z "$BACKEND_AMI_ID" ]; then
+    #     echo "Deregistering Backend AMI: $BACKEND_AMI_ID"
 
-        echo "Finding and deleting associated snapshots..."
+    #     echo "Finding and deleting associated snapshots..."
+    #     snapshot_ids=$(aws ec2 describe-images \
+    #         --image-ids "$BACKEND_AMI_ID" \
+    #         --region "$AWS_REGION" \
+    #         --query "Images[0].BlockDeviceMappings[].Ebs.SnapshotId" \
+    #         --output text 2>/dev/null)
+
+    #     aws ec2 deregister-image --image-id $BACKEND_AMI_ID
+    #     if [ -n "$snapshot_ids" ]; then
+    #         for snap_id in $snapshot_ids; do
+    #             if [ -n "$snap_id" ]; then
+    #                 echo "Deleting snapshot: $snap_id"
+    #                 aws ec2 delete-snapshot --snapshot-id "$snap_id" --region "$AWS_REGION" || true
+    #             fi
+    #         done
+    #     fi
+    # else
+    #     echo "No Backend AMI ID found, skipping deregistration"
+    # fi
+
+
+  echo "Cleaning up AMIs"
+
+  export AWS_REGION="us-east-1"
+
+  declare -A AMI_FILES=(
+    ["frontend"]="terraform/compute/modules/asg/ami_ids/frontend_ami.txt"
+    ["backend"]="terraform/compute/modules/asg/ami_ids/backend_ami.txt"
+  )
+
+    # Loop over frontend and backend AMIs
+    for component in frontend backend; do
+      AMI_FILE="${AMI_FILES[$component]}"
+      AMI_ID=""
+
+      # Load AMI ID if file exists
+      if [ -f "$AMI_FILE" ]; then
+        AMI_ID=$(cat "$AMI_FILE")
+      fi
+
+      if [ -n "$AMI_ID" ]; then
+        echo "🚀 Deregistering ${component^} AMI: $AMI_ID"
+
+        echo "🔍 Finding and deleting associated snapshots..."
         snapshot_ids=$(aws ec2 describe-images \
-            --image-ids "$BACKEND_AMI_ID" \
-            --region "$AWS_REGION" \
-            --query "Images[0].BlockDeviceMappings[].Ebs.SnapshotId" \
-            --output text 2>/dev/null)
+          --image-ids "$AMI_ID" \
+          --region "$AWS_REGION" \
+          --query "Images[0].BlockDeviceMappings[].Ebs.SnapshotId" \
+          --output text 2>/dev/null)
 
-        aws ec2 deregister-image --image-id $BACKEND_AMI_ID
+        aws ec2 deregister-image --image-id "$AMI_ID" --region "$AWS_REGION"
+
         if [ -n "$snapshot_ids" ]; then
-            for snap_id in $snapshot_ids; do
-                if [ -n "$snap_id" ]; then
-                    echo "Deleting snapshot: $snap_id"
-                    aws ec2 delete-snapshot --snapshot-id "$snap_id" --region "$AWS_REGION" || true
-                fi
-            done
+          for snap_id in $snapshot_ids; do
+            if [ -n "$snap_id" ]; then
+              echo "🗑️  Deleting snapshot: $snap_id"
+              aws ec2 delete-snapshot --snapshot-id "$snap_id" --region "$AWS_REGION" || true
+            fi
+          done
         fi
-    else
-        echo "No Backend AMI ID found, skipping deregistration"
-    fi
+      else
+        echo "⚠️  No ${component^} AMI ID found, skipping deregistration"
+      fi
+    done
+
     # # Clear AMI IDs folder if it exists
     if [ -d "terraform/compute/modules/asg/ami_ids" ]; then
         echo "Clearing AMI IDs folder"
@@ -200,6 +246,14 @@ echo "Cleaning up dyanmodb table"
     terraform destroy -auto-approve
 )
 # cd ..
+# Remove existing Packer manifest files if they exist
+if [[ -f "packer/backend/manifest.json" || -f "packer/frontend/manifest.json" ]]; then
+    echo "🧹 Removing old Packer manifest files..."
+    rm -f packer/backend/manifest.json 2>/dev/null || true
+    rm -f packer/frontend/manifest.json 2>/dev/null || true
+else
+    echo "ℹ️ No old Packer manifest files found."
+fi
 
 rm -f terraform/permissions/modules/key/*key*
 rm -f terraform/permissions/modules/key/nat*

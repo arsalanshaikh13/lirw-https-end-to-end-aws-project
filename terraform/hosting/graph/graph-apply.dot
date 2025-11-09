@@ -1,0 +1,35 @@
+digraph G {
+  rankdir = "RL";
+  node [shape = rect, fontname = "sans-serif"];
+  subgraph "cluster_module.cloudfront" {
+    label = "module.cloudfront"
+    fontname = "sans-serif"
+    "module.cloudfront.data.aws_acm_certificate.issued" [label="data.aws_acm_certificate.issued"];
+    "module.cloudfront.aws_cloudfront_cache_policy.caching_optimized" [label="aws_cloudfront_cache_policy.caching_optimized"];
+    "module.cloudfront.aws_cloudfront_distribution.my_distribution" [label="aws_cloudfront_distribution.my_distribution"];
+    "module.cloudfront.aws_cloudfront_origin_request_policy.only-host-header" [label="aws_cloudfront_origin_request_policy.only-host-header"];
+    "module.cloudfront.aws_wafv2_ip_set.block_ipset" [label="aws_wafv2_ip_set.block_ipset"];
+    "module.cloudfront.aws_wafv2_web_acl.alb_acl" [label="aws_wafv2_web_acl.alb_acl"];
+    "module.cloudfront.aws_wafv2_web_acl.block_web_acl" [label="aws_wafv2_web_acl.block_web_acl"];
+    "module.cloudfront.aws_wafv2_web_acl_association.assoc" [label="aws_wafv2_web_acl_association.assoc"];
+  }
+  subgraph "cluster_module.route53" {
+    label = "module.route53"
+    fontname = "sans-serif"
+    "module.route53.data.aws_route53_zone.public-zone" [label="data.aws_route53_zone.public-zone"];
+    "module.route53.aws_route53_record.api_alb_alias" [label="aws_route53_record.api_alb_alias"];
+    "module.route53.aws_route53_record.cloudfront" [label="aws_route53_record.cloudfront"];
+    "module.route53.aws_route53_record.cloudfront_record" [label="aws_route53_record.cloudfront_record"];
+  }
+  "module.cloudfront.aws_cloudfront_distribution.my_distribution" -> "module.cloudfront.data.aws_acm_certificate.issued";
+  "module.cloudfront.aws_cloudfront_distribution.my_distribution" -> "module.cloudfront.aws_cloudfront_cache_policy.caching_optimized";
+  "module.cloudfront.aws_cloudfront_distribution.my_distribution" -> "module.cloudfront.aws_cloudfront_origin_request_policy.only-host-header";
+  "module.cloudfront.aws_cloudfront_distribution.my_distribution" -> "module.cloudfront.aws_wafv2_web_acl.block_web_acl";
+  "module.cloudfront.aws_wafv2_web_acl.block_web_acl" -> "module.cloudfront.aws_wafv2_ip_set.block_ipset";
+  "module.cloudfront.aws_wafv2_web_acl_association.assoc" -> "module.cloudfront.aws_wafv2_web_acl.alb_acl";
+  "module.route53.aws_route53_record.api_alb_alias" -> "module.route53.data.aws_route53_zone.public-zone";
+  "module.route53.aws_route53_record.cloudfront" -> "module.cloudfront.aws_cloudfront_distribution.my_distribution";
+  "module.route53.aws_route53_record.cloudfront" -> "module.route53.data.aws_route53_zone.public-zone";
+  "module.route53.aws_route53_record.cloudfront_record" -> "module.cloudfront.aws_cloudfront_distribution.my_distribution";
+  "module.route53.aws_route53_record.cloudfront_record" -> "module.route53.data.aws_route53_zone.public-zone";
+}

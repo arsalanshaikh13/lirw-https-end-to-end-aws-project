@@ -68,8 +68,10 @@ resource "aws_lb_listener" "alb_http_listener" {
   port              = 443
   protocol          = "HTTPS"
   ssl_policy        = "ELBSecurityPolicy-2016-08"
-  # certificate_arn   = "arn:aws:iam::187416307283:server-certificate/test_cert_rab3wuqwgja25ct3n4jdj2tzu4"
+  # for mock purposes using mock arns
   certificate_arn   = data.aws_acm_certificate.issued.arn
+  # mock certificate for mock plan
+  # certificate_arn   = "arn:aws:iam::187416307283:server-certificate/test_cert_rab3wuqwgja25ct3n4jdj2tzu4"
 
 
   # default_action {
@@ -87,10 +89,10 @@ resource "aws_lb_listener" "alb_http_listener" {
   }
 }
 
-# resource "aws_lb_listener_certificate" "example" {
-#   listener_arn    = aws_lb_listener.alb_http_listener.arn
-#   certificate_arn = data.aws_acm_certificate.issued.arn
-# }
+resource "aws_lb_listener_certificate" "example" {
+  listener_arn    = aws_lb_listener.alb_http_listener.arn
+  certificate_arn = data.aws_acm_certificate.issued.arn
+}
 
 
 resource "aws_lb_listener_rule" "forward-custom-http-header" {

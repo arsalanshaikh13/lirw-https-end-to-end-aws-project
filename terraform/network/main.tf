@@ -1,3 +1,6 @@
+terraform {
+  backend "s3" {}
+}
 module "vpc" {
   source          = "./modules/vpc"
   region          = var.region
@@ -41,4 +44,5 @@ module "security-group" {
 module "s3" {
   source      = "./modules/s3"
   bucket_name = var.bucket_name
+  upload_folder = var.upload_folder
 }

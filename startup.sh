@@ -73,31 +73,41 @@ print_section "Generating SSH keys"
 cd terraform/permissions/modules/key
 # mkdir -p key
 # cd key
-if ! check_local_keys "nat-bastion"; then
-    echo "Creating backend key pair..."
-    ssh-keygen -t rsa -b 4096 -f nat-bastion -N ""
-else
-    echo "nat-bastion key pair already exists locally"
-fi
-echo "nat-bastion SSH key pairs setup completed"
+# if ! check_local_keys "nat-bastion"; then
+#     echo "Creating backend key pair..."
+#     ssh-keygen -t rsa -b 4096 -f nat-bastion -N ""
+# else
+#     echo "nat-bastion key pair already exists locally"
+# fi
+# echo "nat-bastion SSH key pairs setup completed"
 
-# Generate frontend key pair if it doesn't exist
-if ! check_local_keys "client_key"; then
-    echo "Creating client key pair..."
-    ssh-keygen -t rsa -b 4096 -f client_key -N ""
-else
-    echo "Client key pair already exists locally"
-fi
+# # Generate frontend key pair if it doesn't exist
+# if ! check_local_keys "client_key"; then
+#     echo "Creating client key pair..."
+#     ssh-keygen -t rsa -b 4096 -f client_key -N ""
+# else
+#     echo "Client key pair already exists locally"
+# fi
 
-if ! check_local_keys "server_key"; then
-    echo "Creating server key pair..."
-    ssh-keygen -t rsa -b 4096 -f server_key -N ""
-else
-    echo "Server key pair already exists locally"
-fi
+# if ! check_local_keys "server_key"; then
+#     echo "Creating server key pair..."
+#     ssh-keygen -t rsa -b 4096 -f server_key -N ""
+# else
+#     echo "Server key pair already exists locally"
+# fi
 
-echo "SSH key pairs setup completed"
-# cd ../..
+# echo "SSH key pairs setup completed"
+# # cd ../..
+
+
+for key in nat-bastion client_key server_key; do
+  if [ ! -f "$key" ]; then
+    echo "🔑 Creating SSH keypair: $key"
+    ssh-keygen -t rsa -b 4096 -f $key -N ""
+  else
+    echo "🔑 SSH keypair $key already exists"
+  fi
+done
 }
 # running generating ssh function in subshell
 (

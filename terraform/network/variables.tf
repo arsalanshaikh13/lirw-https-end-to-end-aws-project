@@ -10,3 +10,4 @@ variable "pri_sub_6b_cidr" {}
 variable "pri_sub_7a_cidr" {}
 variable "pri_sub_8b_cidr" {}
 variable "bucket_name" {}
+variable "upload_folder" {}

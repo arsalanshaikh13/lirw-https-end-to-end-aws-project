@@ -121,14 +121,6 @@
         key: https://repo.mysql.com/RPM-GPG-KEY-mysql-2023
       become: true
 
-    # - name: Install MySQL client packages
-    #   ansible.builtin.dnf:
-    #     name: mysql80-community-release-el9-1.noarch.rpm
-    #     state: present
-    #   become: true
-    #   # args:
-    #   # chdir: /tmp
-
     - name: Install MySQL client
       ansible.builtin.dnf:
         name: mysql-community-client

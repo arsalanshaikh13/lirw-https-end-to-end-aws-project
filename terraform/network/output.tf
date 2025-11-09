@@ -75,3 +75,6 @@ output "server_sg_id" {
 output "db_sg_id" {
   value = module.security-group.db_sg_id
 }
+output debug_files {
+  value = module.s3.debug_files
+}

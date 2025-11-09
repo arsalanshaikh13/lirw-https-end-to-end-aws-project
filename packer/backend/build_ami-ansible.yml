@@ -10,7 +10,12 @@
     instance_type: "t4g.small"
     # db_port: "3306"
     packer_log_path: "packer.log"
-    ami_output_dir: "../../terraform/compute/modules/asg/ami_ids"
+    # terraform_permissions_dir: "../../terraform/permissions"
+    terraform_permissions_dir: "{{playbook_dir | dirname | dirname }}/terraform/permissions"
+
+    # ami_output_dir: "../../terraform/compute/modules/asg/ami_ids"
+    ami_output_dir: "{{playbook_dir | dirname | dirname }}/terraform/compute/modules/asg/ami_ids"
+    server_key_file: "{{playbook_dir | dirname | dirname }}/terraform/permissions/modules/key/server_key"
     packer_template: "backend.pkr.hcl"
 
     VPC_ID: "{{ lookup('env', 'VPC_ID') }}"
@@ -108,7 +113,8 @@
         mode: "0755"
 
     - name: Get the server_key_name from Terraform output
-      shell: terraform -chdir=../../terraform/permissions output -raw server_key_name
+      # shell: terraform -chdir=../../terraform/permissions output -raw server_key_name
+      shell: terragrunt --working-dir {{ terraform_permissions_dir }}  output -raw server_key_name
       register: server_key_name
       changed_when: false # to avoid marking it as a change if it's idempotent
 
@@ -116,10 +122,40 @@
       debug:
         msg: "The server key name is {{ server_key_name.stdout }}"
 
+    - name: created packer-log version
+      ansible.builtin.shell: |
+        LOG_DIR="packer-logs"
+        mkdir -p "$LOG_DIR"
+
+        # Find the highest existing number
+        last_log=$(ls "$LOG_DIR"/*.log 2>/dev/null | sort -V | tail -n 1 || true)
+        if [ -z "$last_log" ]; then
+          next_num=0
+        else
+          # Extract the number from the filename
+          last_num=$(basename "$last_log" .log | grep -oE '[0-9]+$' || echo 0)
+          next_num=$((last_num + 1))
+        fi
+
+        LOG_FILE="$LOG_DIR/packerlog${next_num}.log"
+        echo "$LOG_FILE"
+      register: log_file_name
+      failed_when: log_file_name.stderr != ""
+      ignore_errors: no
+
+    - name: Set cleaned packer log path
+      set_fact:
+        clean_packer_log_path: "{{ log_file_name.stdout | trim }}"
+
+    - name: Debug check (optional)
+      debug:
+        msg: "Next Packer log file will be {{ clean_packer_log_path }}"
+
+    # PACKER_LOG=1 PACKER_LOG_PATH={{ packer_log_path }} packer build  \
     - block:
         - name: Run packer build
           ansible.builtin.shell: |
-            PACKER_LOG=1 PACKER_LOG_PATH={{ packer_log_path }} packer build  \
+            PACKER_LOG=1 PACKER_LOG_PATH={{ clean_packer_log_path }} packer build  \
               -var "aws_region={{ aws_region }}" \
               -var "source_ami={{ source_ami.stdout }}" \
               -var "instance_type={{ instance_type }}" \
@@ -135,10 +171,15 @@
               -var "s3_ssm_cw_instance_profile_name={{ s3_ssm_cw_instance_profile_name }}" \
               -var "bucket_name={{ bucket_name }}" \
               -var "server_key_name={{ server_key_name.stdout }}" \
+              -var "key_file_path={{ server_key_file }}" \
               {{ packer_template }} | tee >(grep -Eo 'ami-[a-z0-9]{17}' | tail -n1 > {{ ami_output_dir }}/backend_ami.txt)
           args:
             chdir: "{{ playbook_dir }}"
             executable: /bin/bash
+          ignore_errors: no
+          # register: packer_output
+          # failed_when: result.stderr != ""
+
           # changed_when: true
 
         - name: Display saved AMI ID
@@ -150,7 +191,7 @@
           debug:
             msg: "Backend AMI successfully built and saved: {{ ami_id.stdout }}"
 
-    - always:
+      always:
         - name: Remove RDS access rule
           ansible.builtin.command: >
             aws ec2 revoke-security-group-ingress

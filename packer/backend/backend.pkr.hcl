@@ -106,7 +106,7 @@ variable "server_key_name" {
 
 variable "key_file_path" {
   type        = string
-  default     = "../../terraform/permissions/modules/key/server_key"
+  # default     = "../../terraform/permissions/modules/key/server_key"
   description = " key file path"
 }
 

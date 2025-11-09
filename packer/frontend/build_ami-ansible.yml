@@ -6,8 +6,11 @@
 
   vars:
     # terraform_network_dir: "../../terraform/network"
-    terraform_permissions_dir: "../../terraform/permissions"
-    ami_output_dir: "../../terraform/compute/modules/asg/ami_ids"
+    # terraform_permissions_dir: "../../terraform/permissions"
+    terraform_permissions_dir: "{{ playbook_dir | dirname | dirname }}/terraform/permissions"
+    # ami_output_dir: "../../terraform/compute/modules/asg/ami_ids"
+    ami_output_dir: "{{ playbook_dir | dirname | dirname }}/terraform/compute/modules/asg/ami_ids"
+    client_key_file: "{{ playbook_dir | dirname | dirname }}/terraform/permissions/modules/key/client_key"
     packer_file: "frontend.pkr.hcl"
     instance_type: "t4g.small"
     ssh_username: "ec2-user"
@@ -31,7 +34,9 @@
         chdir: "{{ playbook_dir }}"
 
     - name: Get client key name from Terraform output
-      command: terraform -chdir={{ terraform_permissions_dir }} output -raw client_key_name
+      # command: terraform -chdir={{ terraform_permissions_dir }} output -raw client_key_name
+      # shell: terragrunt --working-dir ../../terraform/permissions  output -raw client_key_name
+      shell: terragrunt --working-dir {{ terraform_permissions_dir }}  output -raw client_key_name
       register: client_key_output
       changed_when: false
 
@@ -54,11 +59,40 @@
       debug:
         msg: "Using latest Amazon Linux 2023 AMI: {{ source_ami_output.stdout }}"
 
+    - name: created packer-log version
+      ansible.builtin.shell: |
+        LOG_DIR="packer-logs"
+        mkdir -p "$LOG_DIR"
+
+        # Find the highest existing number
+        last_log=$(ls "$LOG_DIR"/*.log 2>/dev/null | sort -V | tail -n 1 || true)
+
+        if [ -z "$last_log" ]; then
+          next_num=0
+        else
+          # Extract the number from the filename
+          last_num=$(basename "$last_log" .log | grep -oE '[0-9]+$' || echo 0)
+          next_num=$((last_num + 1))
+        fi
+
+        LOG_FILE="$LOG_DIR/packerlog${next_num}.log"
+        echo "$LOG_FILE"
+      register: log_file_name
+      ignore_errors: no
+
+    - name: Set cleaned packer log path
+      set_fact:
+        clean_packer_log_path: "{{ log_file_name.stdout | trim }}"
+
+    - name: Debug check (optional)
+      debug:
+        msg: "Next Packer log file will be {{ clean_packer_log_path }}"
+
+    # PACKER_LOG=1 PACKER_LOG_PATH=packer.log \
     # ---- Packer Build ----
     - name: Build Frontend AMI with Packer
       shell: |
-        PACKER_LOG=1 PACKER_LOG_PATH=packer.log \
-        packer build \
+        PACKER_LOG=1 PACKER_LOG_PATH={{ clean_packer_log_path }} packer build  \
           -var "aws_region={{ aws_region }}" \
           -var "source_ami={{ source_ami_output.stdout }}" \
           -var "instance_type={{ instance_type }}" \
@@ -69,10 +103,12 @@
           -var "bucket_name={{ bucket_name }}" \
           -var "internal_alb_dns_name={{ internal_alb_dns_name }}" \
           -var "client_key_name={{ client_key_output.stdout }}" \
+          -var "key_file_path={{ client_key_file }}" \
           {{ packer_file }} | tee >(grep -Eo 'ami-[a-z0-9]{17}' | tail -n1 > {{ ami_output_dir }}/frontend_ami.txt)
       args:
         executable: /bin/bash
         chdir: "{{ playbook_dir }}"
+      ignore_errors: no
 
     - name: Display saved AMI ID
       shell: cat {{ ami_output_dir }}/frontend_ami.txt

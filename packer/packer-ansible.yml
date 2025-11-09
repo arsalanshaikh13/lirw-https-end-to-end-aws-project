@@ -6,8 +6,10 @@
   gather_facts: false
 
   vars:
-    backend_ami_path: "{{ playbook_dir }}/../terraform/compute/modules/asg/ami_ids/backend_ami.txt"
-    frontend_ami_path: "{{ playbook_dir }}/../terraform/compute/modules/asg/ami_ids/frontend_ami.txt"
+    # backend_ami_path: "{{ playbook_dir }}/../terraform/compute/modules/asg/ami_ids/backend_ami.txt"
+    # frontend_ami_path: "{{ playbook_dir }}/../terraform/compute/modules/asg/ami_ids/frontend_ami.txt"
+    backend_ami_path: "{{ playbook_dir | dirname }}/terraform/compute/modules/asg/ami_ids/backend_ami.txt"
+    frontend_ami_path: "{{ playbook_dir | dirname }}/terraform/compute/modules/asg/ami_ids/frontend_ami.txt"
     backend_build_dir: "{{ playbook_dir }}/backend"
     frontend_build_dir: "{{ playbook_dir }}/frontend"
 
@@ -52,7 +54,7 @@
           ansible.builtin.shell: |
             {
               set -euo pipefail
-              ansible-playbook build_ami-ansible.yml 2>&1 | tee -a build_backend_output.log
+              ansible-playbook build_ami-ansible.yml -vvvv 2>&1 | tee -a build_backend_output.log
             }
           args:
             chdir: "{{ backend_build_dir }}"

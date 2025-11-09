@@ -1,16 +1,21 @@
 
+ terraform {
+    backend "s3" {}
+  }
+
+
 
 # Creating Application Load balancer
 module "alb" {
   source                  = "./modules/alb"
-  project_name            = data.terraform_remote_state.network.outputs.project_name
-  alb_sg_id               = data.terraform_remote_state.network.outputs.alb_sg_id
-  internal_alb_sg_id      = data.terraform_remote_state.network.outputs.internal_alb_sg_id
-  pub_sub_1a_id           = data.terraform_remote_state.network.outputs.pub_sub_1a_id
-  pub_sub_2b_id           = data.terraform_remote_state.network.outputs.pub_sub_2b_id
-  pri_sub_5a_id           = data.terraform_remote_state.network.outputs.pri_sub_5a_id
-  pri_sub_6b_id           = data.terraform_remote_state.network.outputs.pri_sub_6b_id
-  vpc_id                  = data.terraform_remote_state.network.outputs.vpc_id
+  project_name            = var.project_name
+  alb_sg_id               = var.alb_sg_id
+  internal_alb_sg_id      = var.internal_alb_sg_id
+  pub_sub_1a_id           = var.pub_sub_1a_id
+  pub_sub_2b_id           = var.pub_sub_2b_id
+  pri_sub_5a_id           = var.pri_sub_5a_id
+  pri_sub_6b_id           = var.pri_sub_6b_id
+  vpc_id                  = var.vpc_id
   certificate_domain_name = var.certificate_domain_name
 
 }
@@ -19,23 +24,25 @@ resource "null_resource" "build_ami" {
   depends_on = [module.alb]
 
   provisioner "local-exec" {
-    interpreter = ["/bin/bash", "-c"]
+    interpreter = ["bash", "-c"]
     environment = {
-      VPC_ID    = data.terraform_remote_state.network.outputs.vpc_id
-      SUBNET_ID = data.terraform_remote_state.network.outputs.pub_sub_1a_id
+      VPC_ID    = var.vpc_id
+      SUBNET_ID = var.pub_sub_1a_id
       # Get RDS details from Terraform state
-      DB_HOST                         = data.terraform_remote_state.database.outputs.endpoint_address
-      DB_PORT                         = "3306"
-      DB_USER                         = data.terraform_remote_state.database.outputs.db_username
-      DB_PASSWORD                     = data.terraform_remote_state.database.outputs.db_password
-      DB_NAME                         = data.terraform_remote_state.database.outputs.db_name
-      RDS_SG_ID                       = data.terraform_remote_state.network.outputs.db_sg_id
-      s3_ssm_cw_instance_profile_name = data.terraform_remote_state.permissions.outputs.s3_ssm_cw_instance_profile_name
+      DB_HOST                         = var.endpoint_address
+      DB_PORT                         = var.db_port
+      DB_USER                         = var.db_username
+      DB_PASSWORD                     = var.db_password
+      DB_NAME                         = var.db_name
+      RDS_SG_ID                       = var.db_sg_id
+      s3_ssm_cw_instance_profile_name = var.s3_ssm_cw_instance_profile_name
       # db_secret_name                  = module.aws_secret.db_secret_name
-      internal_alb_dns_name   = module.alb.internal_alb_dns_name
-      bucket_name             = data.terraform_remote_state.network.outputs.lirw_bucket_name
-      aws_region              = data.terraform_remote_state.network.outputs.region
+      internal_alb_dns_name   = module.alb.internal_alb_dns_name 
+      # internal_alb_dns_name   = var.alb_dns_name # for mock purposes using alb dns
+      bucket_name             = var.lirw_bucket_name
+      aws_region              = var.region
       ANSIBLE_STDOUT_CALLBACK = "yaml"
+      packer_directory = var.packer_dir
     }
     # command = "bash ../../packer/packer-script.sh"
     # 👇 Run Ansible playbook instead of shell script
@@ -115,33 +122,41 @@ resource "null_resource" "build_ami" {
 
 module "asg" {
   source                          = "./modules/asg"
-  project_name                    = data.terraform_remote_state.network.outputs.project_name
-  client_sg_id                    = data.terraform_remote_state.network.outputs.client_sg_id
-  server_sg_id                    = data.terraform_remote_state.network.outputs.server_sg_id
-  vpc_id                          = data.terraform_remote_state.network.outputs.vpc_id
-  vpc_cidr_block                  = data.terraform_remote_state.network.outputs.vpc_cidr_block
-  pri_sub_3a_id                   = data.terraform_remote_state.network.outputs.pri_sub_3a_id
-  pri_sub_4b_id                   = data.terraform_remote_state.network.outputs.pri_sub_4b_id
-  pri_sub_5a_id                   = data.terraform_remote_state.network.outputs.pri_sub_5a_id
-  pri_sub_6b_id                   = data.terraform_remote_state.network.outputs.pri_sub_6b_id
+  project_name                    = var.project_name
+  client_sg_id                    = var.client_sg_id
+  server_sg_id                    = var.server_sg_id
+  vpc_id                          = var.vpc_id
+  vpc_cidr_block                  = var.vpc_cidr_block
+  pri_sub_3a_id                   = var.pri_sub_3a_id
+  pri_sub_4b_id                   = var.pri_sub_4b_id
+  pri_sub_5a_id                   = var.pri_sub_5a_id
+  pri_sub_6b_id                   = var.pri_sub_6b_id
+
   tg_arn                          = module.alb.tg_arn
   internal_tg_arn                 = module.alb.internal_tg_arn
-  s3_ssm_cw_instance_profile_name = data.terraform_remote_state.permissions.outputs.s3_ssm_cw_instance_profile_name
-  db_dns_address                  = data.terraform_remote_state.database.outputs.endpoint_address
-  db_endpoint                     = data.terraform_remote_state.database.outputs.db_endpoint
-  db_username                     = data.terraform_remote_state.database.outputs.db_username
-  db_password                     = data.terraform_remote_state.database.outputs.db_password
-  db_name                         = data.terraform_remote_state.database.outputs.db_name
-  # db_secret_name                  = data.terraform_remote_state.database.outputs.db_secret_name
   internal_alb_dns_name = module.alb.internal_alb_dns_name
-  bucket_name           = data.terraform_remote_state.network.outputs.lirw_bucket_name
-  region                = data.terraform_remote_state.network.outputs.region
+  # tg_arn                          = var.tg_arn
+  # internal_tg_arn                 = var.internal_tg_arn
+  # internal_alb_dns_name = var.alb_dns_name
+
+  s3_ssm_cw_instance_profile_name = var.s3_ssm_cw_instance_profile_name
+  db_dns_address                  = var.endpoint_address
+  db_endpoint                     = var.db_endpoint
+  db_username                     = var.db_username
+  db_password                     = var.db_password
+  db_name                         = var.db_name
+  # db_secret_name                  = var.db_secret_name # not required as i am using ssm parameters
+
+  bucket_name           = var.lirw_bucket_name
+  region                = var.region
   # backend_ami_id  =  local.backend_ami_id
   # frontend_ami_id  = local.frontend_ami_id
-  client_key_name = data.terraform_remote_state.permissions.outputs.client_key_name
-  server_key_name = data.terraform_remote_state.permissions.outputs.server_key_name
-  pri_rt_a_id     = data.terraform_remote_state.network.outputs.pri_rt_a_id
-  pri_rt_b_id     = data.terraform_remote_state.network.outputs.pri_rt_b_id
+  client_key_name = var.client_key_name
+  server_key_name = var.server_key_name
+  pri_rt_a_id     = var.pri_rt_a_id
+  pri_rt_b_id     = var.pri_rt_b_id
+  frontend_ami_file     = var.frontend_ami_file
+  backend_ami_file     = var.backend_ami_file
   depends_on      = [module.alb, null_resource.build_ami]
 
 }

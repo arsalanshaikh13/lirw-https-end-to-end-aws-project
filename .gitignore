@@ -69,3 +69,10 @@ env.sh
 try.sh
 root
 modules
+commd*
+**log.sh
+**LOG_FILE
+**log.txt
+**.py
+**/.terragrunt-cache/*
+**tree.md

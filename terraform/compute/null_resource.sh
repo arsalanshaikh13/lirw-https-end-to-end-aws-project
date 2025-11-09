@@ -1,6 +1,7 @@
 #!/bin/bash
 set -euo pipefail  # Exit on any error
-ansible-playbook ../../packer/packer-ansible.yml -vvvv 2>&1 | tee -a ../../packer/ansible_output.log
+# ansible-playbook ../../../../../packer/packer-ansible.yml -vvvv 2>&1 | tee -a ../../../../../packer/ansible_output.log
+ansible-playbook "${packer_directory}/packer-ansible.yml" -vvvv 2>&1 | tee -a "${packer_directory}/ansible_output.log"
 exit_code=${PIPESTATUS[0]}
 if [ $$exit_code -ne 0 ]; then
     echo "❌ Ansible playbook failed with exit code $exit_code"

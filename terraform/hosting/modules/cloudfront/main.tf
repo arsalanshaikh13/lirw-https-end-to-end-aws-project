@@ -107,6 +107,8 @@ resource "aws_cloudfront_distribution" "my_distribution" {
   }
   viewer_certificate {
     acm_certificate_arn      = data.aws_acm_certificate.issued.arn
+    # mock certificate for mock plan
+    # acm_certificate_arn   = "arn:aws:iam::187416307283:cf-certificate/test_cert_rab3wuqwgja25ct3n4jdj2323zu4"
     ssl_support_method       = "sni-only"
     minimum_protocol_version = "TLSv1.2_2018"
   }
@@ -158,7 +160,7 @@ resource "aws_cloudfront_distribution" "my_distribution" {
 
 # Setting up WAF 
 resource "aws_wafv2_ip_set" "block_ipset" {
-  name        = "block-ip-set"
+  name        = "block-ip-set1"
   description = "IP Set for blocking specific IPs"
   scope       = "CLOUDFRONT" # or "REGIONAL"
   ip_address_version = "IPV4" # or "IPV6"
